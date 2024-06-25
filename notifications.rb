@@ -7,31 +7,33 @@ module Notifications
 
   module ClassMethods
     def listens_to(event_name)
-      index = name.index("Listener")
-      class_name_prefix = name.slice(0...index).downcase
       event = event_name.to_s
+      class_name_prefix = name[0...name.index("Listener")].downcase
 
-      method_name = "on_#{class_name_prefix}_#{event}"
-
-      define_method method_name.to_sym do |data|
+      define_method :"on_#{class_name_prefix}_#{event}" do |data|
+        @data = data
         message = CONFIG.dig("notifications", class_name_prefix, event)
 
-        expressions = message.scan(/%{{{(.*?)}}}/).flatten
-
-        expressions.each do |expression|
-          message ["%{{{#{expression}}}}"] = evaluate(data, expression)
-        end
-
-        message
+        format_message(message)
       end
     end
   end
 
   module InstanceMethods
-    def evaluate(data, expression)
+    def format_message(message)
+      expressions = message.scan(/%{{{(.*?)}}}/).flatten
+
+      expressions.each do |expression|
+        message ["%{{{#{expression}}}}"] = evaluate(expression)
+      end
+
+      message
+    end
+
+    def evaluate(expression)
       exp_array = expression.split(".").map(&:to_sym)
 
-      data.dig(*exp_array)
+      @data.dig(*exp_array)
     end
   end
 
